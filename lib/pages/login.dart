@@ -156,7 +156,7 @@ class _LoginPageState extends State<LoginPage> {
                   const Text("Want to apply to be a delivery rider? "),
                   GestureDetector(
                     onTap: () {
-                      Get.to(() => const registerRider());
+                      Get.to(() => const RegisterRider());
                     },
                     child: const Text(
                       "Sign Up",
@@ -185,6 +185,7 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    // เช็ค user
     var userQuery = await db
         .collection('Users')
         .where('phone', isEqualTo: phone)
@@ -192,12 +193,23 @@ class _LoginPageState extends State<LoginPage> {
         .get();
 
     if (userQuery.docs.isNotEmpty) {
-      var userData = userQuery.docs.first.data();
+      var userDoc = userQuery.docs.first;
+      var userData = userDoc.data();
+      String uid = userDoc.id; // ดึง uid ของผู้ใช้
+
       Get.snackbar('Success', 'User Login successful');
-      Get.to(() => MainPage(name: userData['name'], status: 'user'));
+      Get.to(
+        () => MainPage(
+          uid: uid,
+          name: userData['name'],
+          status: 'user',
+          profilePicture: userData['profilePicture'] ?? '',
+        ),
+      );
       return;
     }
 
+    // เช็ค rider
     var riderQuery = await db
         .collection('Riders')
         .where('phone', isEqualTo: phone)
@@ -205,9 +217,19 @@ class _LoginPageState extends State<LoginPage> {
         .get();
 
     if (riderQuery.docs.isNotEmpty) {
-      var riderData = riderQuery.docs.first.data();
+      var riderDoc = riderQuery.docs.first;
+      var riderData = riderDoc.data();
+      String uid = riderDoc.id; // ดึง uid ของ rider
+
       Get.snackbar('Success', 'Rider Login successful');
-      Get.to(() => MainPage(name: riderData['name'], status: 'rider'));
+      Get.to(
+        () => MainPage(
+          uid: uid,
+          name: riderData['name'],
+          status: 'rider',
+          profilePicture: riderData['profilePicture'] ?? '',
+        ),
+      );
       return;
     }
 

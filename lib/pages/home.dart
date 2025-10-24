@@ -4,8 +4,16 @@ import 'package:flutter_deliveries_1/pages/createProductPage.dart';
 class MainPage extends StatefulWidget {
   final String name;
   final String status; // "user" หรือ "rider"
+  final String uid;
+  final String profilePicture;
 
-  const MainPage({super.key, required this.name, required this.status});
+  const MainPage({
+    super.key,
+    required this.name,
+    required this.status,
+    required this.uid,
+    required this.profilePicture,
+  });
 
   @override
   State<MainPage> createState() => _MainPageState();
@@ -164,10 +172,10 @@ class _MainPageState extends State<MainPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const CreateProductPage(
-                      uid: '',
-                      name: '',
-                      profilePicture: '',
+                    builder: (context) => CreateProductPage(
+                      uid: widget.uid,
+                      name: widget.name,
+                      profilePicture: widget.profilePicture,
                     ),
                   ),
                 );

@@ -287,7 +287,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             const SizedBox(height: 12),
 
-            // ปุ่มเลือกที่อยู่หลัก
+            /// ปุ่มเลือกที่อยู่หลัก
             ElevatedButton.icon(
               onPressed: () async {
                 LatLng? loc = await Navigator.push(
@@ -301,15 +301,15 @@ class _RegisterPageState extends State<RegisterPage> {
                   });
                 }
               },
-              icon: const Icon(Icons.location_on),
+              icon: const Icon(Icons.location_on, color: Colors.white),
               label: Text(
                 latitude != null && longitude != null
                     ? 'ที่อยู่หลักเลือกแล้ว'
                     : 'เลือกที่อยู่หลัก',
+                style: const TextStyle(color: Colors.white),
               ),
               style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
             ),
-            const SizedBox(height: 12),
 
             // ปุ่มเลือกที่อยู่สำรอง
             ElevatedButton.icon(
@@ -325,24 +325,29 @@ class _RegisterPageState extends State<RegisterPage> {
                   });
                 }
               },
-              icon: const Icon(Icons.location_on_outlined),
+              icon: const Icon(Icons.location_on_outlined, color: Colors.white),
               label: Text(
                 latitudeSecondary != null && longitudeSecondary != null
                     ? 'ที่อยู่สำรองเลือกแล้ว'
                     : 'เลือกที่อยู่สำรอง',
+                style: const TextStyle(color: Colors.white),
               ),
               style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
             ),
-            const SizedBox(height: 12),
 
+            // ปุ่ม Sign Up
             FilledButton(
               onPressed: registerUser,
-              child: const Text('Sign Up'),
+              child: const Text(
+                'Sign Up',
+                style: TextStyle(color: Colors.white),
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: primaryColor,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
+
             const SizedBox(height: 12),
             Center(
               child: GestureDetector(

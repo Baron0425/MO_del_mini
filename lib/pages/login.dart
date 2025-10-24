@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_deliveries_1/pages/Register.dart';
 import 'package:flutter_deliveries_1/pages/home.dart';
+import 'package:flutter_deliveries_1/pages/register.dart';
 import 'package:flutter_deliveries_1/pages/register_rider.dart';
 import 'package:get/get.dart';
 
@@ -137,7 +137,7 @@ class _LoginPageState extends State<LoginPage> {
                   const Text("Don’t have an account ? "),
                   GestureDetector(
                     onTap: () {
-                      Get.to(() => const registerPage());
+                      Get.to(() => const RegisterPage());
                     },
                     child: const Text(
                       "Sign Up",

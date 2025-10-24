@@ -204,6 +204,7 @@ class _LoginPageState extends State<LoginPage> {
           name: userData['name'],
           status: 'user',
           profilePicture: userData['profilePicture'] ?? '',
+          phone: phone,
         ),
       );
       return;
@@ -228,6 +229,7 @@ class _LoginPageState extends State<LoginPage> {
           name: riderData['name'],
           status: 'rider',
           profilePicture: riderData['profilePicture'] ?? '',
+          phone: phone,
         ),
       );
       return;

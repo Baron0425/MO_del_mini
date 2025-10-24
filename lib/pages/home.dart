@@ -1,11 +1,18 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_deliveries_1/pages/IncomingDeliveriesPage.dart';
+import 'package:flutter_deliveries_1/pages/RiderDeliveryMapPage.dart';
 import 'package:flutter_deliveries_1/pages/createProductPage.dart';
+import 'package:flutter_deliveries_1/pages/rider.dart';
+import 'package:flutter_deliveries_1/pages/senderdilveriesPage.dart';
+import 'package:geolocator/geolocator.dart';
 
 class MainPage extends StatefulWidget {
   final String name;
   final String status; // "user" หรือ "rider"
   final String uid;
   final String profilePicture;
+  final String phone;
 
   const MainPage({
     super.key,
@@ -13,6 +20,7 @@ class MainPage extends StatefulWidget {
     required this.status,
     required this.uid,
     required this.profilePicture,
+    required this.phone,
   });
 
   @override
@@ -100,13 +108,70 @@ class _MainPageState extends State<MainPage> {
         ),
       ),
 
-      // ---------------- Bottom Navigation ----------------
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
         selectedItemColor: const Color(0xFF4CAF50),
         unselectedItemColor: Colors.grey,
-        items: isUser
+        onTap: (index) {
+          setState(() => _selectedIndex = index);
+
+          if (widget.status == 'user') {
+            switch (index) {
+              case 0:
+                // หน้าแรก – อาจไม่ต้องทำอะไร
+                break;
+              case 1:
+                // สินค้าที่จะได้รับ
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => IncomingDeliveriesPage(uid: widget.uid),
+                  ),
+                );
+                break;
+              case 2:
+                // จัดส่งสินค้า → เปิด SenderShipmentsPage
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SenderShipmentsPage(
+                      uid: widget.uid,
+                      name: widget.name,
+                      profilePicture: widget.profilePicture,
+                    ),
+                  ),
+                );
+                break;
+              case 3:
+                // โปรไฟล์ – ถ้ามีหน้า Profile
+                break;
+            }
+          } else {
+            // สำหรับ Rider
+            switch (index) {
+              case 0:
+                // หน้าแรก
+                break;
+              case 1:
+                // งานจัดส่ง → RiderPage
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RiderPage(
+                      uid: widget.uid,
+                      name: widget.name,
+                      phone: widget.phone,
+                    ),
+                  ),
+                );
+                break;
+              case 2:
+                // โปรไฟล์
+                break;
+            }
+          }
+        },
+        items: widget.status == 'user'
             ? const [
                 BottomNavigationBarItem(
                   icon: Icon(Icons.home),
@@ -148,7 +213,15 @@ class _MainPageState extends State<MainPage> {
     return Column(
       children: [
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    IncomingDeliveriesPage(uid: widget.uid.toString().trim()),
+              ),
+            );
+          },
           icon: const Icon(Icons.directions_car, size: 30),
           label: const Text(
             'สินค้าที่จะได้รับ',
@@ -156,6 +229,7 @@ class _MainPageState extends State<MainPage> {
           ),
           style: _mainButtonStyle(),
         ),
+
         const SizedBox(height: 20),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -163,11 +237,13 @@ class _MainPageState extends State<MainPage> {
             _buildSmallButton(
               icon: Icons.eco,
               text: "พิกัดสินค้า",
+              uid: widget.uid,
               onTap: () {},
             ),
             _buildSmallButton(
               icon: Icons.local_shipping,
               text: "จัดส่งสินค้า",
+              uid: widget.uid,
               onTap: () {
                 Navigator.push(
                   context,
@@ -192,7 +268,35 @@ class _MainPageState extends State<MainPage> {
     return Column(
       children: [
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () async {
+            // ดึงข้อมูลไรเดอร์จาก Firestore
+            final riderDoc = await FirebaseFirestore.instance
+                .collection('Riders')
+                .doc(widget.uid)
+                .get();
+
+            if (!riderDoc.exists) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('ไม่พบข้อมูลไรเดอร์')),
+              );
+              return;
+            }
+
+            final riderData = riderDoc.data()!;
+            final riderPhone = riderData['phone'] ?? '';
+
+            // เปิด RiderPage พร้อมข้อมูลจริง
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RiderPage(
+                  uid: widget.uid,
+                  name: widget.name,
+                  phone: widget.phone,
+                ),
+              ),
+            );
+          },
           icon: const Icon(Icons.local_shipping, size: 30),
           label: const Text(
             'งานจัดส่ง',
@@ -207,12 +311,58 @@ class _MainPageState extends State<MainPage> {
             _buildSmallButton(
               icon: Icons.people_alt_rounded,
               text: "พิกัดลูกค้า",
+              uid: widget.uid,
               onTap: () {},
             ),
             _buildSmallButton(
               icon: Icons.location_pin,
               text: "พิกัดสินค้า",
-              onTap: () {},
+              uid: widget.uid,
+              onTap: () async {
+                // ตรวจสอบสถานะว่าไรเดอร์รับงานแล้ว
+                final taskSnapshot = await FirebaseFirestore.instance
+                    .collection('deliveries')
+                    .where(
+                      'rider_uid',
+                      isEqualTo: widget.uid,
+                    ) // uid ของไรเดอร์ปัจจุบัน
+                    .where('status', isEqualTo: 2) // งานที่รับแล้ว
+                    .limit(1)
+                    .get();
+
+                if (taskSnapshot.docs.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('คุณยังไม่ได้รับงานใดๆ')),
+                  );
+                  return;
+                }
+
+                final task = taskSnapshot.docs.first;
+                final data = task.data();
+
+                final deliveryLat = data['receiver_lat'];
+                final deliveryLng = data['receiver_lng'];
+
+                if (deliveryLat == null || deliveryLng == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('ไม่พบพิกัดสินค้า')),
+                  );
+                  return;
+                }
+
+                // ดึงตำแหน่งไรเดอร์ปัจจุบัน
+                final position = await Geolocator.getCurrentPosition(
+                  desiredAccuracy: LocationAccuracy.high,
+                );
+
+                // ไปหน้าแมพ
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RiderDeliveryMapPage(riderUid: widget.uid),
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -224,6 +374,7 @@ class _MainPageState extends State<MainPage> {
   Widget _buildSmallButton({
     required IconData icon,
     required String text,
+    required String uid,
     required VoidCallback onTap,
   }) {
     return Expanded(

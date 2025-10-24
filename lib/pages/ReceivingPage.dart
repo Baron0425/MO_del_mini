@@ -19,7 +19,7 @@ class ReceivingPage extends StatefulWidget {
 }
 
 class _ReceivingPageState extends State<ReceivingPage> {
-  @override
+  @override 
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,

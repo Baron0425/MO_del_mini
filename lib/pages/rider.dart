@@ -30,6 +30,16 @@ class RiderPage extends StatelessWidget {
     );
   }
 
+  // ตรวจสอบว่ามีงานค้างอยู่หรือไม่
+  Future<bool> _hasOngoingTask() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('deliveries')
+        .where('rider_uid', isEqualTo: uid)
+        .where('status', whereIn: [2, 3]) // งานที่ยังไม่เสร็จ
+        .get();
+    return snapshot.docs.isNotEmpty;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -40,7 +50,7 @@ class RiderPage extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('deliveries')
-            .where('status', whereIn: [1, 2]) // ดึงงานว่างและงานที่รับแล้ว
+            .where('status', whereIn: [1, 2]) // งานว่างและงานที่รับแล้ว
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -65,6 +75,7 @@ class RiderPage extends StatelessWidget {
               final task = tasks[index];
               final isTaskTakenByMe = task['rider_uid'] == uid;
 
+              // ปุ่ม "รับงาน" จะถูกตรวจสอบด้วย FutureBuilder
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 child: ListTile(
@@ -73,42 +84,60 @@ class RiderPage extends StatelessWidget {
                     'ผู้รับ: ${task['receiver_name'] ?? '-'}\nสถานะ: ${task['status'] ?? '-'}',
                   ),
                   trailing: task['status'] == 1
-                      ? ElevatedButton(
-                          onPressed: () async {
-                            Position? pos = await _getCurrentLocation();
-                            if (pos == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('ไม่สามารถดึงตำแหน่งได้'),
+                      ? FutureBuilder<bool>(
+                          future: _hasOngoingTask(),
+                          builder: (context, snapshot) {
+                            bool hasOngoing = snapshot.data ?? false;
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const CircularProgressIndicator();
+                            }
+                            if (hasOngoing) {
+                              return const Text(
+                                'ไม่สามารถรับงานได้',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               );
-                              return;
                             }
+                            return ElevatedButton(
+                              onPressed: () async {
+                                Position? pos = await _getCurrentLocation();
+                                if (pos == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('ไม่สามารถดึงตำแหน่งได้'),
+                                    ),
+                                  );
+                                  return;
+                                }
 
-                            await FirebaseFirestore.instance
-                                .collection('deliveries')
-                                .doc(task['id'])
-                                .update({
-                                  'status': 2,
-                                  'rider_uid': uid,
-                                  'rider_name': name,
-                                  'rider_phone': phone,
-                                  'rider_lat': pos.latitude,
-                                  'rider_lng': pos.longitude,
-                                });
+                                await FirebaseFirestore.instance
+                                    .collection('deliveries')
+                                    .doc(task['id'])
+                                    .update({
+                                      'status': 2,
+                                      'rider_uid': uid,
+                                      'rider_name': name,
+                                      'rider_phone': phone,
+                                      'rider_lat': pos.latitude,
+                                      'rider_lng': pos.longitude,
+                                    });
 
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('รับงานเรียบร้อยแล้ว'),
-                              ),
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('รับงานเรียบร้อยแล้ว'),
+                                  ),
+                                );
+                              },
+                              child: const Text('รับงาน'),
                             );
                           },
-                          child: const Text('รับงาน'),
                         )
                       : isTaskTakenByMe
                       ? ElevatedButton(
                           onPressed: () {
-                            // กดดูรายละเอียดงาน
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('ยังไม่มีหน้ารายละเอียด'),

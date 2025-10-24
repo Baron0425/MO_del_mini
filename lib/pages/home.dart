@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_deliveries_1/pages/IncomingDeliveriesPage.dart';
 import 'package:flutter_deliveries_1/pages/RiderDeliveryMapPage.dart';
 import 'package:flutter_deliveries_1/pages/createProductPage.dart';
+import 'package:flutter_deliveries_1/pages/profile.dart';
 import 'package:flutter_deliveries_1/pages/rider.dart';
 import 'package:flutter_deliveries_1/pages/senderdilveriesPage.dart';
 import 'package:geolocator/geolocator.dart';
@@ -121,7 +122,6 @@ class _MainPageState extends State<MainPage> {
                 // หน้าแรก – อาจไม่ต้องทำอะไร
                 break;
               case 1:
-                // สินค้าที่จะได้รับ
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -130,7 +130,6 @@ class _MainPageState extends State<MainPage> {
                 );
                 break;
               case 2:
-                // จัดส่งสินค้า → เปิด SenderShipmentsPage
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -143,7 +142,14 @@ class _MainPageState extends State<MainPage> {
                 );
                 break;
               case 3:
-                // โปรไฟล์ – ถ้ามีหน้า Profile
+                // เปิด ProfilePage สำหรับ user
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        ProfilePage(uid: widget.uid, status: 'user'),
+                  ),
+                );
                 break;
             }
           } else {
@@ -153,7 +159,6 @@ class _MainPageState extends State<MainPage> {
                 // หน้าแรก
                 break;
               case 1:
-                // งานจัดส่ง → RiderPage
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -166,7 +171,14 @@ class _MainPageState extends State<MainPage> {
                 );
                 break;
               case 2:
-                // โปรไฟล์
+                // เปิด ProfilePage สำหรับ rider
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        ProfilePage(uid: widget.uid, status: 'rider'),
+                  ),
+                );
                 break;
             }
           }
@@ -183,7 +195,7 @@ class _MainPageState extends State<MainPage> {
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.local_shipping),
-                  label: 'จัดส่งสินค้า',
+                  label: 'สินค้าที่จัดส่ง',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.person),

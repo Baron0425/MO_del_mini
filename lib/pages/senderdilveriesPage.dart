@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
 class SenderShipmentsPage extends StatefulWidget {
   final String uid;
@@ -25,19 +29,11 @@ class _SenderShipmentsPageState extends State<SenderShipmentsPage> {
       appBar: AppBar(
         title: const Text('งานจัดส่ง'),
         backgroundColor: Colors.green,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.map),
-            onPressed: _showAllShipmentsMap,
-            tooltip: 'แสดงแผนที่ทั้งหมด',
-          ),
-        ],
       ),
       body: _buildListView(),
     );
   }
 
-  // แสดงรายการทั้งหมด
   Widget _buildListView() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -73,21 +69,14 @@ class _SenderShipmentsPageState extends State<SenderShipmentsPage> {
             final doc = deliveries[i];
             final d = doc.data() as Map<String, dynamic>;
             final status = d['status'] ?? 1;
-
-            return _buildDeliveryCard(d, status, i, doc.id);
+            return _buildDeliveryCard(d, status, i);
           },
         );
       },
     );
   }
 
-  // Card แสดงรายละเอียด Shipment
-  Widget _buildDeliveryCard(
-    Map<String, dynamic> d,
-    int status,
-    int index,
-    String docId,
-  ) {
+  Widget _buildDeliveryCard(Map<String, dynamic> d, int status, int index) {
     final receiverLat = d['receiver_lat']?.toString() ?? '-';
     final receiverLng = d['receiver_lng']?.toString() ?? '-';
     final productImage = d['product_image'] as String?;
@@ -101,26 +90,31 @@ class _SenderShipmentsPageState extends State<SenderShipmentsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: รูปสินค้า + ชื่องาน + สถานะ
+            // Header
             Row(
               children: [
-                // รูปสินค้า
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: productImage != null && productImage.isNotEmpty
-                      ? Image.network(
-                          productImage,
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return _buildPlaceholderImage();
-                          },
-                        )
-                      : _buildPlaceholderImage(),
+                GestureDetector(
+                  onTap: () {
+                    if (productImage != null && productImage.isNotEmpty) {
+                      _showFullImage(context, productImage);
+                    }
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: productImage != null && productImage.isNotEmpty
+                        ? Image.network(
+                            productImage,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildPlaceholderImage();
+                            },
+                          )
+                        : _buildPlaceholderImage(),
+                  ),
                 ),
                 const SizedBox(width: 12),
-                // ชื่องาน
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,11 +142,9 @@ class _SenderShipmentsPageState extends State<SenderShipmentsPage> {
             ),
             const SizedBox(height: 12),
 
-            // สถานะ
             _buildStatusIndicator(status),
             const Divider(height: 24),
 
-            // รายละเอียดผู้รับ
             const Text(
               "📍 ข้อมูลผู้รับ",
               style: TextStyle(
@@ -175,7 +167,41 @@ class _SenderShipmentsPageState extends State<SenderShipmentsPage> {
               "$receiverLat, $receiverLng",
             ),
 
-            // รายละเอียดไรเดอร์ (ถ้ามี)
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (receiverLat != '-' && receiverLng != '-') {
+                  final lat = double.tryParse(receiverLat);
+                  final lng = double.tryParse(receiverLng);
+                  if (lat != null && lng != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DeliveryMapPage(
+                          deliveryLocation: LatLng(lat, lng),
+                          riderLocation:
+                              d['rider_lat'] != null && d['rider_lng'] != null
+                              ? LatLng(
+                                  double.parse(d['rider_lat'].toString()),
+                                  double.parse(d['rider_lng'].toString()),
+                                )
+                              : null,
+                          receiverName: d['receiver_name'] ?? 'ผู้รับ',
+                          riderName: d['rider_name'],
+                        ),
+                      ),
+                    );
+                  }
+                }
+              },
+              icon: const Icon(Icons.map),
+              label: const Text('ดูแผนที่'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+            ),
+
             if (d['rider_name'] != null) ...[
               const Divider(height: 24),
               const Text(
@@ -194,30 +220,42 @@ class _SenderShipmentsPageState extends State<SenderShipmentsPage> {
                 "${d['rider_lat']?.toString() ?? '-'}, ${d['rider_lng']?.toString() ?? '-'}",
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
 
-            const SizedBox(height: 12),
-
-            // ปุ่มดูแผนที่
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openSingleShipmentMap(d),
-                    icon: const Icon(Icons.map, size: 18),
-                    label: const Text('ดูแผนที่งานนี้'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.green,
-                      side: const BorderSide(color: Colors.green),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () => _openNavigationToReceiver(d),
-                  icon: const Icon(Icons.navigation, color: Colors.blue),
-                  tooltip: 'นำทางไปผู้รับ',
-                ),
-              ],
+  void _showFullImage(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    padding: const EdgeInsets.all(20),
+                    color: Colors.white,
+                    child: const Text('ไม่สามารถโหลดรูปภาพได้'),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+              ),
+              child: const Text('ปิด'),
             ),
           ],
         ),
@@ -225,7 +263,6 @@ class _SenderShipmentsPageState extends State<SenderShipmentsPage> {
     );
   }
 
-  // Placeholder สำหรับรูปที่โหลดไม่ได้
   Widget _buildPlaceholderImage() {
     return Container(
       width: 60,
@@ -238,7 +275,6 @@ class _SenderShipmentsPageState extends State<SenderShipmentsPage> {
     );
   }
 
-  // แถวรายละเอียด
   Widget _buildDetailRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -266,7 +302,6 @@ class _SenderShipmentsPageState extends State<SenderShipmentsPage> {
     );
   }
 
-  // แสดงสถานะพร้อมไอคอน (2.2.3)
   Widget _buildStatusIndicator(int status) {
     final statusInfo = _getStatusInfo(status);
     return Container(
@@ -293,7 +328,6 @@ class _SenderShipmentsPageState extends State<SenderShipmentsPage> {
     );
   }
 
-  // ข้อมูลสถานะ
   Map<String, dynamic> _getStatusInfo(int status) {
     switch (status) {
       case 1:
@@ -312,109 +346,332 @@ class _SenderShipmentsPageState extends State<SenderShipmentsPage> {
         return {
           'text': 'ไรเดอร์กำลังจัดส่ง',
           'color': Colors.green,
+          'icon': Icons.delivery_dining,
+        };
+      case 4:
+        return {
+          'text': 'ส่งสำเร็จ',
+          'color': Colors.grey,
           'icon': Icons.check_circle,
         };
       default:
         return {
-          'text': 'ไรเดอร์ส่งสำเร็จ ',
-          'color': Colors.grey,
-          'icon': Icons.help,
+          'text': 'ไม่ทราบสถานะ',
+          'color': Colors.black45,
+          'icon': Icons.help_outline,
         };
     }
   }
+}
 
-  // เปิดแผนที่แบบแยก Shipment (2.2.4 ทางเลือก 2)
-  Future<void> _openSingleShipmentMap(Map<String, dynamic> d) async {
-    final receiverLat = d['receiver_lat'] as num?;
-    final receiverLng = d['receiver_lng'] as num?;
-    final riderLat = d['rider_lat'] as num?;
-    final riderLng = d['rider_lng'] as num?;
+// ---------- หน้าแผนที่ (แก้ไขแล้ว) ----------
+class DeliveryMapPage extends StatefulWidget {
+  final LatLng deliveryLocation;
+  final LatLng? riderLocation;
+  final String receiverName;
+  final String? riderName;
 
-    if (receiverLat == null || receiverLng == null) {
-      _showSnackBar('ไม่พบพิกัดผู้รับ');
-      return;
-    }
+  const DeliveryMapPage({
+    super.key,
+    required this.deliveryLocation,
+    this.riderLocation,
+    required this.receiverName,
+    this.riderName,
+  });
 
-    // สร้าง URL สำหรับแสดงแผนที่
-    String url;
-    if (riderLat != null && riderLng != null) {
-      // แสดงทั้งผู้รับและไรเดอร์
-      url =
-          'https://www.google.com/maps/dir/?api=1&origin=$riderLat,$riderLng&destination=$receiverLat,$receiverLng';
-    } else {
-      // แสดงเฉพาะผู้รับ
-      url =
-          'https://www.google.com/maps/search/?api=1&query=$receiverLat,$receiverLng';
-    }
+  @override
+  State<DeliveryMapPage> createState() => _DeliveryMapPageState();
+}
 
-    await _launchURL(url);
+class _DeliveryMapPageState extends State<DeliveryMapPage> {
+  List<LatLng> polylinePoints = [];
+  List<Marker> markers = [];
+  bool isLoading = true;
+  final MapController mapController = MapController();
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeMap();
   }
 
-  // นำทางไปยังผู้รับ
-  Future<void> _openNavigationToReceiver(Map<String, dynamic> d) async {
-    final receiverLat = d['receiver_lat'] as num?;
-    final receiverLng = d['receiver_lng'] as num?;
-
-    if (receiverLat == null || receiverLng == null) {
-      _showSnackBar('ไม่พบพิกัดผู้รับ');
-      return;
+  Future<void> _initializeMap() async {
+    _setupMarkers();
+    if (widget.riderLocation != null) {
+      await _getRoute();
     }
-
-    final url =
-        'https://www.google.com/maps/dir/?api=1&destination=$receiverLat,$receiverLng&travelmode=driving';
-    await _launchURL(url);
+    setState(() {
+      isLoading = false;
+    });
   }
 
-  // แสดงแผนที่ทั้งหมด (2.2.4 ทางเลือก 1)
-  Future<void> _showAllShipmentsMap() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('deliveries')
-        .where('sender_id', isEqualTo: widget.uid)
-        .get();
+  void _setupMarkers() {
+    print('🎯 Delivery Location: ${widget.deliveryLocation}');
+    print('🏍️ Rider Location: ${widget.riderLocation}');
 
-    if (snapshot.docs.isEmpty) {
-      _showSnackBar('ยังไม่มีงานจัดส่ง');
-      return;
+    // Marker จุดส่ง (สีเขียว)
+    markers.add(
+      Marker(
+        point: widget.deliveryLocation,
+        width: 100,
+        height: 100,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                widget.receiverName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Icon(Icons.location_on, color: Colors.green, size: 50),
+          ],
+        ),
+      ),
+    );
+
+    // Marker ไรเดอร์ (สีน้ำเงิน)
+    if (widget.riderLocation != null) {
+      markers.add(
+        Marker(
+          point: widget.riderLocation!,
+          width: 100,
+          height: 100,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  widget.riderName ?? 'ไรเดอร์',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Icon(Icons.motorcycle, color: Colors.blue, size: 50),
+            ],
+          ),
+        ),
+      );
     }
+  }
 
-    final deliveries = snapshot.docs;
-    final List<String> markers = [];
+  Future<void> _getRoute() async {
+    if (widget.riderLocation == null) return;
+    try {
+      final url =
+          'https://router.project-osrm.org/route/v1/driving/${widget.riderLocation!.longitude},${widget.riderLocation!.latitude};${widget.deliveryLocation.longitude},${widget.deliveryLocation.latitude}?overview=full&geometries=geojson';
+      final response = await http.get(Uri.parse(url));
 
-    for (var doc in deliveries) {
-      final d = doc.data();
-      final receiverLat = d['receiver_lat'] as num?;
-      final receiverLng = d['receiver_lng'] as num?;
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final coordinates =
+            data['routes'][0]['geometry']['coordinates'] as List;
 
-      if (receiverLat != null && receiverLng != null) {
-        markers.add('$receiverLat,$receiverLng');
+        setState(() {
+          polylinePoints = coordinates
+              .map((coord) => LatLng(coord[1].toDouble(), coord[0].toDouble()))
+              .toList();
+        });
       }
-    }
-
-    if (markers.isEmpty) {
-      _showSnackBar('ไม่พบพิกัดในงานจัดส่ง');
-      return;
-    }
-
-    // เปิด Google Maps แสดงหลายจุด
-    final firstMarker = markers.first;
-    final url = 'https://www.google.com/maps/search/?api=1&query=$firstMarker';
-    await _launchURL(url);
-  }
-
-  // เปิด URL
-  Future<void> _launchURL(String urlString) async {
-    final uri = Uri.parse(urlString);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      _showSnackBar('ไม่สามารถเปิดแผนที่ได้');
+    } catch (e) {
+      print('❌ Error getting route: $e');
     }
   }
 
-  // แสดง SnackBar
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  // คำนวณระยะทางและ zoom level ที่เหมาะสม
+  double _calculateZoom() {
+    if (widget.riderLocation == null) return 15.0;
+
+    final distance = const Distance().as(
+      LengthUnit.Kilometer,
+      widget.riderLocation!,
+      widget.deliveryLocation,
+    );
+
+    if (distance > 50) return 10.0;
+    if (distance > 20) return 11.0;
+    if (distance > 10) return 12.0;
+    if (distance > 5) return 13.0;
+    if (distance > 2) return 14.0;
+    return 15.0;
+  }
+
+  LatLng _calculateCenter() {
+    if (widget.riderLocation == null) {
+      return widget.deliveryLocation;
+    }
+
+    return LatLng(
+      (widget.riderLocation!.latitude + widget.deliveryLocation.latitude) / 2,
+      (widget.riderLocation!.longitude + widget.deliveryLocation.longitude) / 2,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final center = _calculateCenter();
+    final zoom = _calculateZoom();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('พิกัดสินค้า'),
+        backgroundColor: Colors.green,
+        actions: [
+          // ปุ่มแสดงข้อมูล
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('ข้อมูลพิกัด'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('📍 จุดส่ง: ${widget.receiverName}'),
+                      Text(
+                        '   ${widget.deliveryLocation.latitude.toStringAsFixed(6)}, ${widget.deliveryLocation.longitude.toStringAsFixed(6)}',
+                      ),
+                      const SizedBox(height: 8),
+                      if (widget.riderLocation != null) ...[
+                        Text('🏍️ ไรเดอร์: ${widget.riderName ?? "ไรเดอร์"}'),
+                        Text(
+                          '   ${widget.riderLocation!.latitude.toStringAsFixed(6)}, ${widget.riderLocation!.longitude.toStringAsFixed(6)}',
+                        ),
+                      ] else
+                        const Text('🏍️ ยังไม่มีไรเดอร์รับงาน'),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('ปิด'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          FlutterMap(
+            mapController: mapController,
+            options: MapOptions(
+              initialCenter: center,
+              initialZoom: zoom,
+              maxZoom: 18,
+              minZoom: 3,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    'https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=79ac29ccd24941cd84fa305b8da14ae1',
+                userAgentPackageName: 'com.example.app',
+              ),
+              if (polylinePoints.isNotEmpty)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: polylinePoints,
+                      color: Colors.blue,
+                      strokeWidth: 5,
+                      borderColor: Colors.white,
+                      borderStrokeWidth: 2,
+                    ),
+                  ],
+                ),
+              MarkerLayer(markers: markers),
+            ],
+          ),
+
+          // ปุ่มควบคุมแผนที่
+          Positioned(
+            right: 16,
+            bottom: 100,
+            child: Column(
+              children: [
+                // ปุ่มโฟกัสจุดส่ง
+                FloatingActionButton(
+                  heroTag: 'delivery',
+                  mini: true,
+                  backgroundColor: Colors.green,
+                  onPressed: () {
+                    mapController.move(widget.deliveryLocation, 16);
+                  },
+                  child: const Icon(Icons.location_on, color: Colors.white),
+                ),
+                const SizedBox(height: 8),
+                // ปุ่มโฟกัสไรเดอร์
+                if (widget.riderLocation != null)
+                  FloatingActionButton(
+                    heroTag: 'rider',
+                    mini: true,
+                    backgroundColor: Colors.blue,
+                    onPressed: () {
+                      mapController.move(widget.riderLocation!, 16);
+                    },
+                    child: const Icon(Icons.motorcycle, color: Colors.white),
+                  ),
+                const SizedBox(height: 8),
+                // ปุ่มดูภาพรวม
+                FloatingActionButton(
+                  heroTag: 'overview',
+                  mini: true,
+                  backgroundColor: Colors.grey.shade700,
+                  onPressed: () {
+                    mapController.move(center, zoom);
+                  },
+                  child: const Icon(Icons.zoom_out_map, color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

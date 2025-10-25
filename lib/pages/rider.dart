@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_deliveries_1/pages/Riderproduct.dart';
 import 'package:geolocator/geolocator.dart';
 
 class RiderPage extends StatelessWidget {
@@ -50,7 +51,10 @@ class RiderPage extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('deliveries')
-            .where('status', whereIn: [1, 2]) // งานว่างและงานที่รับแล้ว
+            .where(
+              'status',
+              whereIn: [1, 2, 3],
+            ) // งานว่าง, รับแล้ว, กำลังจัดส่ง
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -75,7 +79,6 @@ class RiderPage extends StatelessWidget {
               final task = tasks[index];
               final isTaskTakenByMe = task['rider_uid'] == uid;
 
-              // ปุ่ม "รับงาน" จะถูกตรวจสอบด้วย FutureBuilder
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 child: ListTile(
@@ -138,9 +141,13 @@ class RiderPage extends StatelessWidget {
                       : isTaskTakenByMe
                       ? ElevatedButton(
                           onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('ยังไม่มีหน้ารายละเอียด'),
+                            // 👇 เปิดหน้ารายละเอียดงาน
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => RiderOrderDetailPage(
+                                  deliveryId: task['id'],
+                                ),
                               ),
                             );
                           },

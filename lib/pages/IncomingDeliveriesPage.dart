@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_deliveries_1/pages/UserDeliveryDetailPage.dart';
 
 class IncomingDeliveriesPage extends StatefulWidget {
   final String uid;
@@ -13,9 +14,7 @@ class IncomingDeliveriesPage extends StatefulWidget {
 class _IncomingDeliveriesPageState extends State<IncomingDeliveriesPage> {
   @override
   Widget build(BuildContext context) {
-    // แปลง uid ให้ชัวร์เป็น string และ trim
     final String uid = widget.uid.toString().trim();
-    print('Querying deliveries for UID: $uid');
 
     return Scaffold(
       appBar: AppBar(
@@ -27,53 +26,131 @@ class _IncomingDeliveriesPageState extends State<IncomingDeliveriesPage> {
             .collection('deliveries')
             .where('receiver_uid', isEqualTo: uid)
             .snapshots(),
-
         builder: (context, snapshot) {
-          // กำลังโหลด
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // ถ้าเกิด error
           if (snapshot.hasError) {
             return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
           }
 
-          // ถ้าไม่มีข้อมูล
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            print('จำนวนเอกสารที่ได้: ${snapshot.data?.docs.length ?? 0}');
             return const Center(child: Text('ยังไม่มีสินค้าที่ส่งมาหาคุณ'));
           }
 
           final deliveries = snapshot.data!.docs;
-          print('จำนวนเอกสารที่ได้: ${deliveries.length}');
 
           return ListView.builder(
             itemCount: deliveries.length,
             itemBuilder: (context, index) {
               final data = deliveries[index].data() as Map<String, dynamic>;
+              final deliveryId =
+                  deliveries[index].id; // ✅ เอา id เอกสารไว้ส่งต่อ
+
+              // ✅ แปลงสถานะเป็นข้อความและสี
+              String statusText = '';
+              Color statusColor = Colors.black;
+
+              switch (data['status']) {
+                case 1:
+                  statusText = 'รอไรเดอร์รับสินค้า';
+                  statusColor = Colors.orange;
+                  break;
+                case 2:
+                  statusText = 'ไรเดอร์กำลังไปรับสินค้า';
+                  statusColor = Colors.blue;
+                  break;
+                case 3:
+                  statusText = 'กำลังจัดส่ง';
+                  statusColor = Colors.green;
+                  break;
+                case 4:
+                  statusText = 'จัดส่งสำเร็จ';
+                  statusColor = Colors.grey;
+                  break;
+                default:
+                  statusText = 'ไม่ทราบสถานะ';
+              }
 
               return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                child: ListTile(
-                  leading: data['product_image'] != null
-                      ? Image.network(
-                          data['product_image'],
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                        )
-                      : const Icon(Icons.inventory),
-                  title: Text(data['product_name'] ?? 'ไม่มีชื่อสินค้า'),
-                  subtitle: Text('ผู้ส่ง: ${data['sender_name'] ?? 'ไม่ทราบ'}'),
-                  trailing: Text(
-                    data['status'] == 1
-                        ? 'รอไรเดอร์รับสินค้า'
-                        : 'ไรเดอร์รับแล้ว',
-                    style: const TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
-                    ),
+                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 3,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: data['product_image'] != null
+                            ? Image.network(
+                                data['product_image'],
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.cover,
+                              )
+                            : const Icon(Icons.inventory, size: 50),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              data['product_name'] ?? 'ไม่มีชื่อสินค้า',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text('ผู้ส่ง: ${data['sender_name'] ?? 'ไม่ทราบ'}'),
+                            Text(
+                              statusText,
+                              style: TextStyle(
+                                color: statusColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // ✅ ปุ่มดูรายละเอียด
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => UserDeliveryDetailPage(
+                                deliveryId: deliveryId,
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'ดูรายละเอียด',
+                          style: TextStyle(fontSize: 14, color: Colors.white),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );

@@ -1,12 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_deliveries_1/pages/IncomingDeliveriesPage.dart';
-import 'package:flutter_deliveries_1/pages/RiderDeliveryMapPage.dart';
-import 'package:flutter_deliveries_1/pages/createProductPage.dart';
+import 'package:flutter_deliveries_1/pages/createProduct.dart';
 import 'package:flutter_deliveries_1/pages/profile.dart';
 import 'package:flutter_deliveries_1/pages/rider.dart';
-import 'package:flutter_deliveries_1/pages/senderdilveriesPage.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:flutter_deliveries_1/pages/rider_delivery_map_page.dart';
+import 'package:flutter_deliveries_1/pages/senderCreateItemPage.dart';
+import 'package:latlong2/latlong.dart';
 
 class MainPage extends StatefulWidget {
   final String name;
@@ -119,7 +119,6 @@ class _MainPageState extends State<MainPage> {
           if (widget.status == 'user') {
             switch (index) {
               case 0:
-                // หน้าแรก – อาจไม่ต้องทำอะไร
                 break;
               case 1:
                 Navigator.push(
@@ -130,10 +129,11 @@ class _MainPageState extends State<MainPage> {
                 );
                 break;
               case 2:
+                // ✅ เปลี่ยนให้ไปหน้า SenderCreatedItemsPage
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => SenderShipmentsPage(
+                    builder: (_) => SenderCreatedItemsPage(
                       uid: widget.uid,
                       name: widget.name,
                       profilePicture: widget.profilePicture,
@@ -142,7 +142,6 @@ class _MainPageState extends State<MainPage> {
                 );
                 break;
               case 3:
-                // เปิด ProfilePage สำหรับ user
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -156,7 +155,6 @@ class _MainPageState extends State<MainPage> {
             // สำหรับ Rider
             switch (index) {
               case 0:
-                // หน้าแรก
                 break;
               case 1:
                 Navigator.push(
@@ -171,7 +169,6 @@ class _MainPageState extends State<MainPage> {
                 );
                 break;
               case 2:
-                // เปิด ProfilePage สำหรับ rider
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -331,13 +328,10 @@ class _MainPageState extends State<MainPage> {
               text: "พิกัดสินค้า",
               uid: widget.uid,
               onTap: () async {
-                // ตรวจสอบสถานะว่าไรเดอร์รับงานแล้ว
+                // ตรวจสอบว่าไรเดอร์มีงานรับแล้ว
                 final taskSnapshot = await FirebaseFirestore.instance
                     .collection('deliveries')
-                    .where(
-                      'rider_uid',
-                      isEqualTo: widget.uid,
-                    ) // uid ของไรเดอร์ปัจจุบัน
+                    .where('rider_uid', isEqualTo: widget.uid)
                     .where('status', isEqualTo: 2) // งานที่รับแล้ว
                     .limit(1)
                     .get();
@@ -352,26 +346,56 @@ class _MainPageState extends State<MainPage> {
                 final task = taskSnapshot.docs.first;
                 final data = task.data();
 
-                final deliveryLat = data['receiver_lat'];
-                final deliveryLng = data['receiver_lng'];
+                final deliveryLat = data['receiver_lat'] as double?;
+                final deliveryLng = data['receiver_lng'] as double?;
+                final receiverName =
+                    data['receiver_name'] as String? ?? 'ผู้รับไม่ระบุ';
+                final senderId = data['sender_id'] as String?;
 
-                if (deliveryLat == null || deliveryLng == null) {
+                if (deliveryLat == null ||
+                    deliveryLng == null ||
+                    senderId == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('ไม่พบพิกัดสินค้า')),
+                    const SnackBar(
+                      content: Text('ไม่พบพิกัดสินค้า หรือร้านค้า'),
+                    ),
                   );
                   return;
                 }
 
-                // ดึงตำแหน่งไรเดอร์ปัจจุบัน
-                final position = await Geolocator.getCurrentPosition(
-                  desiredAccuracy: LocationAccuracy.high,
-                );
+                // ดึงพิกัดร้านค้าจาก Users collection
+                final senderDoc = await FirebaseFirestore.instance
+                    .collection('Users')
+                    .doc(senderId)
+                    .get();
 
-                // ไปหน้าแมพ
+                if (!senderDoc.exists) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('ไม่พบข้อมูลร้านค้า')),
+                  );
+                  return;
+                }
+
+                final senderData = senderDoc.data()!;
+                final loc = senderData['location'];
+                if (loc == null || loc['lat'] == null || loc['lng'] == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('ร้านค้ายังไม่มีพิกัด')),
+                  );
+                  return;
+                }
+
+                final senderLat = loc['lat'] as double;
+                final senderLng = loc['lng'] as double;
+
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => RiderDeliveryMapPage(riderUid: widget.uid),
+                    builder: (_) => RiderDeliveryMapPage(
+                      deliveryLocation: LatLng(deliveryLat, deliveryLng),
+                      senderLocation: LatLng(senderLat, senderLng),
+                      receiverName: receiverName,
+                    ),
                   ),
                 );
               },

@@ -100,83 +100,139 @@ class SenderShipmentsPage extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 5,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    if (displayImage != null && displayImage.isNotEmpty) {
-                      _showFullImage(context, displayImage);
-                    }
-                  },
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: displayImage != null && displayImage.isNotEmpty
-                        ? Image.network(
-                            displayImage,
-                            width: 60,
-                            height: 60,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _buildPlaceholderImage(),
-                          )
-                        : _buildPlaceholderImage(),
-                  ),
+            // 🔹 รูปสินค้าอยู่ตรงกลาง
+            GestureDetector(
+              onTap: () {
+                if (displayImage != null && displayImage.isNotEmpty) {
+                  _showFullImage(context, displayImage);
+                }
+              },
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: displayImage != null && displayImage.isNotEmpty
+                      ? Image.network(
+                          displayImage,
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              _buildPlaceholderImage(),
+                        )
+                      : _buildPlaceholderImage(),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "งานที่ ${index + 1}",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.green,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        d['product_name'] ?? '-',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
-            _buildStatusIndicator(status),
-            const Divider(height: 24),
 
-            const Text(
-              "📍 ข้อมูลผู้รับ",
-              style: TextStyle(
-                fontSize: 15,
+            const SizedBox(height: 12),
+            Text(
+              d['product_name'] ?? '-',
+              style: const TextStyle(
                 fontWeight: FontWeight.bold,
+                fontSize: 18,
                 color: Colors.green,
               ),
             ),
+            const SizedBox(height: 6),
+            _buildStatusIndicator(status),
+            const Divider(height: 24),
+
+            // 🔹 ข้อมูลสินค้า
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "ข้อมูลสินค้า",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+            ),
             const SizedBox(height: 8),
-            _buildDetailRow(Icons.person, "ชื่อ", d['receiver_name'] ?? '-'),
-            _buildDetailRow(Icons.phone, "เบอร์", d['receiver_phone'] ?? '-'),
+            _buildDetailRow(
+              Icons.label,
+              "ชื่อสินค้า",
+              d['product_name'] ?? '-',
+            ),
+            _buildDetailRow(
+              Icons.description,
+              "รายละเอียด",
+              d['product_description'] ?? '-',
+            ),
+            if (d['product_weight'] != null)
+              _buildDetailRow(
+                Icons.scale,
+                "น้ำหนัก",
+                "${d['product_weight']} กรัม",
+              ),
+            const Divider(height: 24),
+
+            // 🔹 ข้อมูลผู้รับ
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "ข้อมูลผู้รับ",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildDetailRow(
+              Icons.person,
+              "ชื่อผู้รับ",
+              d['receiver_name'] ?? '-',
+            ),
+            _buildDetailRow(
+              Icons.phone,
+              "เบอร์ผู้รับ",
+              d['receiver_phone'] ?? '-',
+            ),
             _buildDetailRow(
               Icons.home,
-              "ที่อยู่",
+              "ที่อยู่ผู้รับ",
               d['receiver_address'] ?? '-',
             ),
 
+            const SizedBox(height: 12),
+
+            // 🔹 ข้อมูลไรเดอร์
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "ข้อมูลไรเดอร์",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+            ),
             const SizedBox(height: 8),
+            _buildDetailRow(
+              Icons.person,
+              "ชื่อไรเดอร์",
+              d['rider_name'] ?? '-',
+            ),
+            _buildDetailRow(
+              Icons.phone,
+              "เบอร์ไรเดอร์",
+              d['rider_phone'] ?? '-',
+            ),
+
+            const SizedBox(height: 16),
+
+            // 🔹 ปุ่มดูแผนที่
             ElevatedButton.icon(
               onPressed: status != 1
                   ? () async {
@@ -189,8 +245,6 @@ class SenderShipmentsPage extends StatelessWidget {
                       );
                       if (senderLocation == null) return;
 
-                      final riderLat = d['rider_lat'];
-                      final riderLng = d['rider_lng'];
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -208,6 +262,10 @@ class SenderShipmentsPage extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],

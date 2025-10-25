@@ -25,6 +25,8 @@ class CreateProductPage extends StatefulWidget {
 class _CreateProductPageState extends State<CreateProductPage> {
   final _formKey = GlobalKey<FormState>();
   final _productName = TextEditingController();
+  final _productDescription =
+      TextEditingController(); // ✅ เพิ่มช่องรายละเอียดสินค้า
   final _receiverPhone = TextEditingController();
 
   File? _image;
@@ -49,7 +51,6 @@ class _CreateProductPageState extends State<CreateProductPage> {
     _fetchReceivers();
   }
 
-  /// ดึงรายชื่อผู้รับจาก Firestore โดยไม่รวมผู้ส่งเอง
   Future<void> _fetchReceivers() async {
     final snapshot = await FirebaseFirestore.instance
         .collection('Users')
@@ -57,24 +58,22 @@ class _CreateProductPageState extends State<CreateProductPage> {
         .get();
 
     setState(() {
-      _receiverList = snapshot.docs
-          .where((doc) => doc.id != widget.uid) // ไม่รวมผู้ส่งเอง
-          .map((e) {
-            final data = e.data();
-            return {
-              'id': e.id,
-              'name': data['name'],
-              'phone': data['phone'],
-              'profilePicture': data['profilePicture'],
-              'location': data['location'],
-              'secondaryLocation': data['secondaryLocation'],
-            };
-          })
-          .toList();
+      _receiverList = snapshot.docs.where((doc) => doc.id != widget.uid).map((
+        e,
+      ) {
+        final data = e.data();
+        return {
+          'id': e.id,
+          'name': data['name'],
+          'phone': data['phone'],
+          'profilePicture': data['profilePicture'],
+          'location': data['location'],
+          'secondaryLocation': data['secondaryLocation'],
+        };
+      }).toList();
     });
   }
 
-  /// แปลง lat/lng → ชื่อที่อยู่
   Future<String> _getReadableAddress(double lat, double lng) async {
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
@@ -93,7 +92,6 @@ class _CreateProductPageState extends State<CreateProductPage> {
     }
   }
 
-  /// โหลดชื่อที่อยู่จาก lat/lng
   Future<void> _loadReceiverAddresses() async {
     if (_selectedReceiverData == null) return;
 
@@ -115,7 +113,6 @@ class _CreateProductPageState extends State<CreateProductPage> {
     setState(() {});
   }
 
-  /// ค้นหาผู้รับจากเบอร์โทร โดยไม่รวมผู้ส่งเอง
   Future<void> _searchReceiverByPhone(String phone) async {
     if (phone.isEmpty) {
       ScaffoldMessenger.of(
@@ -133,7 +130,6 @@ class _CreateProductPageState extends State<CreateProductPage> {
     if (result.docs.isNotEmpty) {
       final doc = result.docs.first;
 
-      // ไม่ให้เลือกผู้ส่งเอง
       if (doc.id == widget.uid) {
         ScaffoldMessenger.of(
           context,
@@ -155,7 +151,6 @@ class _CreateProductPageState extends State<CreateProductPage> {
     }
   }
 
-  /// เลือกรูปภาพ
   Future<void> _pickImage(bool fromCamera) async {
     final picked = await ImagePicker().pickImage(
       source: fromCamera ? ImageSource.camera : ImageSource.gallery,
@@ -163,7 +158,6 @@ class _CreateProductPageState extends State<CreateProductPage> {
     if (picked != null) setState(() => _image = File(picked.path));
   }
 
-  /// บันทึกข้อมูลสินค้า
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_image == null) {
@@ -197,6 +191,8 @@ class _CreateProductPageState extends State<CreateProductPage> {
         'receiver_lat': _selectedAddressGeo!['lat'],
         'receiver_lng': _selectedAddressGeo!['lng'],
         'product_name': _productName.text.trim(),
+        'product_description': _productDescription.text
+            .trim(), // ✅ เพิ่มบันทึกรายละเอียด
         'product_image': upload.secureUrl,
         'status': 1,
         'created_at': FieldValue.serverTimestamp(),
@@ -215,7 +211,6 @@ class _CreateProductPageState extends State<CreateProductPage> {
     }
   }
 
-  /// เลือกผู้รับจากลิสต์
   void _selectReceiver(Map<String, dynamic> r) {
     setState(() {
       _selectedReceiverData = r;
@@ -226,7 +221,6 @@ class _CreateProductPageState extends State<CreateProductPage> {
     _loadReceiverAddresses();
   }
 
-  /// แสดงลิสต์ผู้รับ
   void _showReceiverList() {
     showModalBottomSheet(
       context: context,
@@ -384,6 +378,21 @@ class _CreateProductPageState extends State<CreateProductPage> {
               ),
               const SizedBox(height: 15),
 
+              // ✅ ช่องรายละเอียดสินค้า
+              TextFormField(
+                controller: _productDescription,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'รายละเอียดสินค้า',
+                  alignLabelWithHint: true,
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) =>
+                    v!.isEmpty ? 'กรุณากรอกรายละเอียดสินค้า' : null,
+              ),
+
+              const SizedBox(height: 15),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -400,6 +409,7 @@ class _CreateProductPageState extends State<CreateProductPage> {
                 ],
               ),
               const SizedBox(height: 10),
+
               if (_image != null)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
